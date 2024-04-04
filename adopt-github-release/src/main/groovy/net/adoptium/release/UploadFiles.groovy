@@ -20,11 +20,13 @@ class UploadAdoptReleaseFiles {
     private final String server
     private final String org
     private final String edition
-
-    UploadAdoptReleaseFiles(String tag, String description, boolean release, String version, String server, String org, String edition, List<File> files) {
+    private final boolean isDevKit
+    
+    UploadAdoptReleaseFiles(String tag, String description, boolean release, boolean isDevKit, String version, String server, String org, String edition, List<File> files) {
         this.tag = tag
         this.description = description
         this.release = release
+        this.isDevKit = isDevKit 
         this.files = files
         this.version = version
         this.server = server
@@ -33,18 +35,22 @@ class UploadAdoptReleaseFiles {
     }
 
     void release() {
-        def grouped = files.groupBy {
-            switch (it.getName()) {
-                case ~/.*semeru.*/: "ibm"; break;
-            }
-        }
         GHRepository repo = getRepo(edition)
         println("REPO:$repo")
         GHRelease release = getRelease(repo)
         println("RELEASE:$release")
-        uploadFiles(release, grouped.get("ibm"))
+        if (isDevKit) {
+            uploadFiles(release, files)
+        } else {
+            def grouped = files.groupBy {
+                switch (it.getName()) {
+                    case ~/.*semeru.*/: "ibm"; break;
+                }
+          }
+        }
+          uploadFiles(release, grouped.get("ibm"))
     }
-
+    
     private GHRepository getRepo(String vendor) {
         String token = System.getenv("GITHUB_TOKEN")
         if (token == null) {
@@ -65,16 +71,22 @@ class UploadAdoptReleaseFiles {
                         (int) TimeUnit.SECONDS.toMillis(120)))
 
         println("Using Github org:'${org}'")
-        // jdk11 => 11
-        def numberVersion = version.replaceAll(/[^0-9]/, "")
-        def repoName = "${org}/temurin${numberVersion}-binaries"
 
-        if (vendor == "open") {
-            repoName = "${org}/semeru${numberVersion}-binaries"
-        } else if (vendor == "certified") {
-            repoName = "${org}/semeru${numberVersion}-certified-binaries"
-        } else if (vendor == "ea") {
-            repoName = "${org}/semeru${numberVersion}-ea-binaries"
+        def repoName
+        if (isDevKit) {
+          repoName = "${org}/devkit-binaries"
+        } else {
+          // jdk11 => 11
+          def numberVersion = version.replaceAll(/[^0-9]/, "")
+          repoName = "${org}/temurin${numberVersion}-binaries"
+
+            if (vendor != "adopt") {
+                //repoName = "${org}/open${version}-${vendor}-binaries"
+                def edition = "${vendor}-"
+                if (vendor == "open") {
+                    edition = ""
+                }
+                repoName = "${org}/semeru${numberVersion}-${edition}binaries"        
         }
         println("reponame:${repoName}")
         return github.getRepository(repoName)
@@ -127,6 +139,7 @@ static void main(String[] args) {
             options.t,
             options.d,
             options.r,
+            options.k,
             options.v,
             options.s,
             options.o,
@@ -145,6 +158,7 @@ private OptionAccessor parseArgs(String[] args) {
                 t longOpt: 'tag', type: String, args: 1, 'Tag name'
                 d longOpt: 'description', type: String, args: 1, 'Release description'
                 r longOpt: 'release', 'Is a release build'
+                k longOpt: 'isDevKit', 'Is a DevKit build'
                 h longOpt: 'help', 'Show usage information'
                 s longOpt: 'server', type: String, args: 1, optionalArg: true, defaultValue: 'https://api.github.com', 'Github server'
                 o longOpt: 'org', type: String, args: 1, optionalArg: true, defaultValue: 'adoptium', 'Github org'
