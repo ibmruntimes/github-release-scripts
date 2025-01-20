@@ -21,12 +21,14 @@ class UploadAdoptReleaseFiles {
     private final String org
     private final String edition
     private final boolean isDevKit
+    private final boolean isPkgSrc
     
-    UploadAdoptReleaseFiles(String tag, String description, boolean release, boolean isDevKit, String version, String server, String org, String edition, List<File> files) {
+    UploadAdoptReleaseFiles(String tag, String description, boolean release, boolean isDevKit, boolean isPkgSrc, String version, String server, String org, String edition, List<File> files) {
         this.tag = tag
         this.description = description
         this.release = release
-        this.isDevKit = isDevKit 
+        this.isDevKit = isDevKit
+        this.isPkgSrc = isPkgSrc
         this.files = files
         this.version = version
         this.server = server
@@ -39,7 +41,7 @@ class UploadAdoptReleaseFiles {
         println("REPO:$repo")
         GHRelease release = getRelease(repo)
         println("RELEASE:$release")
-        if (isDevKit) {
+        if (isDevKit || isPkgSrc) {
             uploadFiles(release, files)
         } else {
             def grouped = files.groupBy {
@@ -75,6 +77,8 @@ class UploadAdoptReleaseFiles {
         def repoName
         if (isDevKit) {
           repoName = "${org}/devkit-binaries"
+        } else if (isPkgSrc) {
+          repoName = "${org}/temurin-linux-pkg-sources"
         } else {
           // jdk11 => 11
           def numberVersion = version.replaceAll(/[^0-9]/, "")
@@ -140,6 +144,7 @@ static void main(String[] args) {
             options.d,
             options.r,
             options.k,
+            options.p,
             options.v,
             options.s,
             options.o,
@@ -159,6 +164,7 @@ private OptionAccessor parseArgs(String[] args) {
                 d longOpt: 'description', type: String, args: 1, 'Release description'
                 r longOpt: 'release', 'Is a release build'
                 k longOpt: 'isDevKit', 'Is a DevKit build'
+                p longOpt: 'isPkgSrc', 'Is a linux package src build'
                 h longOpt: 'help', 'Show usage information'
                 s longOpt: 'server', type: String, args: 1, optionalArg: true, defaultValue: 'https://api.github.com', 'Github server'
                 o longOpt: 'org', type: String, args: 1, optionalArg: true, defaultValue: 'adoptium', 'Github org'
